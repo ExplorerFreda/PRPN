@@ -103,3 +103,10 @@ ENV/
 
 # PyCharm
 .idea
+
+# Slurm
+slurm*
+*.sh
+
+# Models
+model/

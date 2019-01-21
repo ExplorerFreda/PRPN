@@ -66,6 +66,12 @@ parser.add_argument('--model', type=str, default='new_gate',
                     help='type of model to use')
 parser.add_argument('--device', type=int, default=0,
                     help='select GPU')
+parser.add_argument('--checkpoint', type=str, default='./model/checkpoint.pt',
+                    help='check point to tackle 4hr limit on slurm')
+parser.add_argument('--stepoch', type=int, default=0,
+                    help='start epoch number')
+parser.add_argument('--eprun', type=int, default=15,
+                    help='number of epoch for this run')
 args = parser.parse_args()
 
 torch.cuda.set_device(args.device)
@@ -224,9 +230,17 @@ best_loss = None
 optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0, 0.999), eps=1e-9, weight_decay=args.weight_decay)
 scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min', 0.5, patience=0)
 
+# Load checkpoint if it is a continuation.
+if args.stepoch != 0:
+    assert os.path.exists(args.checkpoint)
+    checkpoint = torch.load(args.checkpoint)
+    model.load_state_dict(checkpoint['model'])
+    optimizer.load_state_dict(checkpoint['optimizer'])
+    scheduler.step(checkpoint['train_loss'])
+
 # At any point you can hit Ctrl + C to break out of training early.
 try:
-    for epoch in range(1, args.epochs + 1):
+    for epoch in range(args.stepoch + 1, min(args.epochs, args.stepoch + args.eprun) + 1):
         epoch_start_time = time.time()
         train_loss = train()
         test_f1 = test(model, corpus, args.cuda)
@@ -240,7 +254,16 @@ try:
                 torch.save(model, f)
             best_loss = train_loss
         scheduler.step(train_loss)
-
+        # Save checkpoint
+        torch.save(
+            {
+                'model': model.state_dict(),
+                'train_loss': train_loss,
+                'optimizer': optimizer.state_dict(),
+                'epoch_num': epoch
+            },
+            args.checkpoint
+        )
 except KeyboardInterrupt:
     print('-' * 89)
     print('Exiting from training early')
