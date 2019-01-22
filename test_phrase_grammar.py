@@ -1,11 +1,9 @@
 import argparse
-
+import os 
 import nltk
 import numpy
 import torch
 from torch.autograd import Variable
-
-import data_ptb as data
 
 
 # Test model
@@ -49,7 +47,18 @@ def mean(x):
     return sum(x) / len(x)
 
 
-def test(model, corpus, sens, trees, cuda, prt=False):
+def tree2str(node):
+    if type(node) is list:
+        tree_list = ['(']
+        for child in node:
+            tree_list.append(tree2str(child))
+        tree_list.append(')')
+        return ' '.join(tree_list)
+    elif type(node) is str:
+        return node
+
+
+def test(model, corpus, sens, trees, cuda, prt=False, outfile=None):
     model.eval()
 
     prec_list = []
@@ -57,6 +66,8 @@ def test(model, corpus, sens, trees, cuda, prt=False):
     f1_list = []
 
     nsens = 0
+    if outfile is not None:
+        fout = open(outfile, 'w')
     for sen, sen_tree in zip(sens, trees):
         # if len(sen) > 12:
         #     continue
@@ -91,11 +102,12 @@ def test(model, corpus, sens, trees, cuda, prt=False):
         prec_list.append(prec)
         reca_list.append(reca)
         f1_list.append(f1)
+        
+        if outfile is not None:
+            fout.write(tree2str(parse_tree) + '\n')
 
         nsens += 1
         if prt and nsens % 100 == 0:
-            # for i in range(len(sen)):
-            #     print '%15s\t%.2f\t%s' % (sen[i], depth[i], str(attentions[i, 1]))
             print 'Model output:'
             print parse_tree
             print model_out
@@ -109,6 +121,9 @@ def test(model, corpus, sens, trees, cuda, prt=False):
         print '-' * 80
         print 'Mean Prec: %f, Mean Reca: %f, Mean F1: %f' % (mean(prec_list), mean(reca_list), mean(f1_list))
         print 'Number of sentence: %i' % nsens
+
+    if outfile is not None:
+        fout.close()
 
     return mean(f1_list)
 
@@ -129,7 +144,16 @@ if __name__ == '__main__':
                         help='random seed')
     parser.add_argument('--cuda', action='store_true',
                         help='use CUDA')
+    parser.add_argument('--datatype', type=str, required=True,
+                        help='data type for testing')
     args = parser.parse_args()
+
+    if args.datatype == 'ptb':
+        import data_ptb as data
+    elif args.datatype == 'coco':
+        import data_coco as data
+    else:
+        raise Exception('Data type {:s} not supported.'.format(args.datatype))
 
     # Set the random seed manually for reproducibility.
     torch.manual_seed(args.seed)
@@ -146,4 +170,8 @@ if __name__ == '__main__':
     # Load data
     corpus = data.Corpus(args.data)
 
-    test(model, corpus, corpus.train_sens, corpus.train_trees, args.cuda, prt=True)
+    f1_score = test(
+        model, corpus, corpus.test_sens, corpus.test_trees, args.cuda, 
+        prt=False, outfile=os.path.join(os.path.dirname(args.checkpoint), 'tree_strs.txt')
+    )
+    print 'F1 score:', f1_score
