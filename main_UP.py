@@ -9,14 +9,13 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.autograd import Variable
 
-import data_ptb as data
 from model_PRPN import PRPN
 from test_phrase_grammar import test
 
 parser = argparse.ArgumentParser(description='PyTorch PennTreeBank RNN/LSTM Language Model')
 parser.add_argument('--data', type=str, default='./data/ptb',
                     help='location of the data corpus')
-parser.add_argument('--emsize', type=int, default=200,
+parser.add_argument('--emsize', type=int, default=300,
                     help='size of word embeddings')
 parser.add_argument('--nhid', type=int, default=400,
                     help='number of hidden units per layer')
@@ -72,6 +71,8 @@ parser.add_argument('--stepoch', type=int, default=0,
                     help='start epoch number')
 parser.add_argument('--eprun', type=int, default=15,
                     help='number of epoch for this run')
+parser.add_argument('--datatype', type=str, required=True,
+                    help='model type for training, PTB/COCO')
 args = parser.parse_args()
 
 torch.cuda.set_device(args.device)
@@ -87,6 +88,13 @@ if torch.cuda.is_available():
 ###############################################################################
 # Load data
 ###############################################################################
+
+if args.datatype == 'coco':
+    import data_coco as data
+elif args.datatype == 'ptb':
+    import data_ptb as data
+else:
+    raise Exception('Data type {:s} not supported.'.format(args.datatype))
 
 corpus = data.Corpus(args.data)
 
@@ -243,7 +251,7 @@ try:
     for epoch in range(args.stepoch + 1, min(args.epochs, args.stepoch + args.eprun) + 1):
         epoch_start_time = time.time()
         train_loss = train()
-        test_f1 = test(model, corpus, args.cuda)
+        test_f1 = test(model, corpus, corpus.valid_sens, corpus.valid_trees, args.cuda)
         print('-' * 89)
         print('| end of epoch {:3d} | time: {:5.2f}s | train loss {:5.2f} | test f1 {:5.2f}'.format(
             epoch, (time.time() - epoch_start_time), train_loss, test_f1))
@@ -273,7 +281,7 @@ with open(args.save, 'rb') as f:
     model = torch.load(f)
 
 # Run on test data.
-test_f1 = test(model, corpus, args.cuda)
+test_f1 = test(model, corpus, corpus.test_sens, corpus.test_trees, args.cuda)
 print('=' * 89)
 print('| End of training | test f1 {:5.2f}'.format(
     test_f1))

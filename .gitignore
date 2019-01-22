@@ -107,6 +107,7 @@ ENV/
 # Slurm
 slurm*
 *.sh
+*.template
 
 # Models
 model/
