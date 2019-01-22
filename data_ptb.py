@@ -1,6 +1,6 @@
 import os
 import re
-import cPickle
+import pickle
 import copy
 
 import numpy
@@ -52,7 +52,7 @@ class Dictionary(object):
         return len(self.idx2word)
 
     def __getitem__(self, item):
-        if self.word2idx.has_key(item):
+        if item in self.word2idx:
             return self.word2idx[item]
         else:
             return self.word2idx['<unk>']
@@ -66,7 +66,7 @@ class Dictionary(object):
                 self.idx2word.append(k)
                 self.word2idx[k] = len(self.idx2word) - 1
 
-        print 'Number of words:', len(self.idx2word)
+        print('Number of words:', len(self.idx2word))
         return len(self.idx2word)
 
 
@@ -74,14 +74,14 @@ class Corpus(object):
     def __init__(self, path):
         dict_file_name = os.path.join(path, 'dict.pkl')
         if os.path.exists(dict_file_name):
-            self.dictionary = cPickle.load(open(dict_file_name, 'rb'))
+            self.dictionary = pickle.load(open(dict_file_name, 'rb'))
         else:
             self.dictionary = Dictionary()
             self.add_words(train_file_ids)
             # self.add_words(valid_file_ids)
             # self.add_words(test_file_ids)
             self.dictionary.rebuild_by_freq()
-            cPickle.dump(self.dictionary, open(dict_file_name, 'wb'))
+            pickle.dump(self.dictionary, open(dict_file_name, 'wb'))
 
         self.train, self.train_sens, self.train_trees = self.tokenize(train_file_ids)
         self.valid, self.valid_sens, self.valid_trees = self.tokenize(valid_file_ids)
@@ -143,5 +143,4 @@ class Corpus(object):
                     idx.append(self.dictionary[word])
                 sens_idx.append(torch.LongTensor(idx))
                 trees.append(tree2list(sen_tree))
-
         return sens_idx, sens, trees
