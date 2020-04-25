@@ -16,7 +16,7 @@ class Dictionary(object):
         return len(self.idx2word)
 
     def __getitem__(self, key):
-        if self.word2idx.has_key(key):
+        if key in self.word2idx:
             return self.word2idx[key]
         else:
             return self.word2idx['<unk>']

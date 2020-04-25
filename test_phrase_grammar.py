@@ -95,19 +95,19 @@ def test(model, corpus, cuda, prt=False):
         if prt and nsens % 100 == 0:
             # for i in range(len(sen)):
             #     print '%15s\t%.2f\t%s' % (sen[i], depth[i], str(attentions[i, 1]))
-            print 'Model output:'
-            print parse_tree
-            print model_out
-            print 'Standard output:'
-            print sen_tree
-            print std_out
-            print 'Prec: %f, Reca: %f, F1: %f' % (prec, reca, f1)
-            print '-' * 80
+            print('Model output:')
+            print(parse_tree)
+            print(model_out)
+            print('Standard output:')
+            print(sen_tree)
+            print(std_out)
+            print('Prec: %f, Reca: %f, F1: %f' % (prec, reca, f1))
+            print('-' * 80)
 
     if prt:
-        print '-' * 80
-        print 'Mean Prec: %f, Mean Reca: %f, Mean F1: %f' % (mean(prec_list), mean(reca_list), mean(f1_list))
-        print 'Number of sentence: %i' % nsens
+        print('-' * 80)
+        print('Mean Prec: %f, Mean Reca: %f, Mean F1: %f' % (mean(prec_list), mean(reca_list), mean(f1_list)))
+        print('Number of sentence: %i' % nsens)
 
     return mean(f1_list)
 

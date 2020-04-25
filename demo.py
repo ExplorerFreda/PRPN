@@ -67,7 +67,7 @@ torch.manual_seed(args.seed)
 with open(args.checkpoint, 'rb') as f:
     model = torch.load(f)
 model.eval()
-print model
+print(model)
 
 model.cpu()
 
@@ -76,7 +76,7 @@ ntokens = len(corpus.dictionary)
 input = Variable(torch.rand(1, 1).mul(ntokens).long(), volatile=True)
 
 while True:
-    sens = raw_input('Input a sentences:')
+    sens = input('Input a sentences:')
     words = sens.strip().split()
     x = numpy.array([corpus.dictionary[w] for w in words])
     input = Variable(torch.LongTensor(x[:, None]))
@@ -87,4 +87,4 @@ while True:
     gates = model.gates.squeeze().data.numpy()
 
     parse_tree = build_tree(gates, words)
-    print MRG(parse_tree)
+    print(MRG(parse_tree))

@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.autograd import Variable
+torch.backends.cudnn.enabled = False
 
 import data
 from model_PRPN import PRPN
@@ -186,10 +187,10 @@ def train():
         if batch % args.log_interval == 0 and batch > 0:
             cur_loss = total_loss[0] / args.log_interval
             elapsed = time.time() - start_time
-            print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
+            print(('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
                   'loss {:5.2f} | ppl {:8.2f}'.format(
                 epoch, batch, len(train_data) // args.bptt, lr,
-                              elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
+                              elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss))))
             total_loss = 0
             start_time = time.time()
 
@@ -206,11 +207,11 @@ try:
         epoch_start_time = time.time()
         train()
         val_loss = evaluate(val_data)
-        print('-' * 89)
-        print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
+        print(('-' * 89))
+        print(('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
               'valid ppl {:8.2f}'.format(epoch, (time.time() - epoch_start_time),
-                                         val_loss, math.exp(val_loss)))
-        print('-' * 89)
+                                         val_loss, math.exp(val_loss))))
+        print(('-' * 89))
         # Save the model if the validation loss is the best we've seen so far.
         if not best_val_loss or val_loss < best_val_loss:
             with open(args.save, 'wb') as f:
@@ -219,7 +220,7 @@ try:
         scheduler.step(val_loss)
 
 except KeyboardInterrupt:
-    print('-' * 89)
+    print(('-' * 89))
     print('Exiting from training early')
 
 # Load the best saved model.
@@ -228,7 +229,7 @@ with open(args.save, 'rb') as f:
 
 # Run on test data.
 test_loss = evaluate(test_data)
-print('=' * 89)
-print('| End of training | test loss {:5.2f} | test ppl {:8.2f}'.format(
-    test_loss, math.exp(test_loss)))
-print('=' * 89)
+print(('=' * 89))
+print(('| End of training | test loss {:5.2f} | test ppl {:8.2f}'.format(
+    test_loss, math.exp(test_loss))))
+print(('=' * 89))
