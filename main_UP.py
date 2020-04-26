@@ -68,7 +68,6 @@ parser.add_argument('--model', type=str, default='new_gate',
 parser.add_argument('--device', type=int, default=0,
                     help='select GPU')
 parser.add_argument('--evalb-dir', type=str, default='../EVALB/')
-parser.add_argument('--few', action='store_true', default=False)
 args = parser.parse_args()
 
 torch.cuda.set_device(args.device)
@@ -231,7 +230,7 @@ def train():
 lr = args.lr
 best_measure = None
 optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0, 0.999), eps=1e-9, weight_decay=args.weight_decay)
-scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min', 0.5, patience=0)
+scheduler = lr_scheduler.StepLR(optimizer, 25, 0.5)
 flog = open(args.save.replace('.pt', '.log'), 'w')
 
 # At any point you can hit Ctrl + C to break out of training early.
@@ -239,31 +238,24 @@ flog = open(args.save.replace('.pt', '.log'), 'w')
 for epoch in range(1, args.epochs + 1):
     epoch_start_time = time.time()
     dev_loss = train()
-    if not args.few:
-        dev_f1 = test(model, corpus, (corpus.valid_sens, corpus.valid_trees), args.cuda, args.evalb_dir)
-        test_f1 = test(model, corpus, (corpus.test_sens, corpus.test_trees), args.cuda, args.evalb_dir)
-        print('-' * 89)
-        print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | dev f1 {:5.2f} | test f1 {:5.2f}'.format(
-            epoch, (time.time() - epoch_start_time), dev_loss, dev_f1, test_f1))
-        print('-' * 89)
-        flog.write('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | dev f1 {:5.2f} | test f1 {:5.2f}'.format(
-            epoch, (time.time() - epoch_start_time), dev_loss, dev_f1, test_f1) + '\n')
-    else:
-        test_f1 = test(model, corpus, (corpus.test_sens, corpus.test_trees), args.cuda, args.evalb_dir)
-        for idx in range(0, 55*5, 55):
-            dev_f1 = test(model, corpus, (corpus.valid_sens[idx:idx+55], corpus.valid_trees[idx:idx+55]), args.cuda, args.evalb_dir)
-            print('-' * 89)
-            print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | dev f1 {:5.2f} | test f1 {:5.2f}'.format(
-                epoch, (time.time() - epoch_start_time), dev_loss, dev_f1, test_f1))
-            print('-' * 89)
-            flog.write('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | dev f1 {:5.2f} | test f1 {:5.2f}'.format(
-                epoch, (time.time() - epoch_start_time), dev_loss, dev_f1, test_f1) + '\n')
-    measure = dev_loss
+    dev_f1 = test(model, corpus, (corpus.valid_sens, corpus.valid_trees), args.cuda, args.evalb_dir)
+    test_f1 = test(model, corpus, (corpus.test_sens, corpus.test_trees), args.cuda, args.evalb_dir)
+    print('-' * 89)
+    print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | dev f1 {:5.2f} | test f1 {:5.2f}'.format(
+        epoch, (time.time() - epoch_start_time), dev_loss, dev_f1, test_f1))
+    print('-' * 89)
+    flog.write('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | dev f1 {:5.2f} | test f1 {:5.2f}'.format(
+        epoch, (time.time() - epoch_start_time), dev_loss, dev_f1, test_f1) + '\n')
+    for idx in range(0, 55*5, 55):
+        dev_f1 = test(model, corpus, (corpus.valid_sens[idx:idx+55], corpus.valid_trees[idx:idx+55]), args.cuda, args.evalb_dir)
+        print('| few-shot dev f1 {:5.2f} |'.format(dev_f1))
+        flog.write('| few-shot dev f1 {:5.2f} |'.format(dev_f1))
     # Save the model if the validation loss is the best we've seen so far.
+    measure = dev_loss
     if not best_measure or measure < best_measure:
         with open(args.save, 'wb') as f:
             torch.save(model, f)
         best_measure = measure
-    scheduler.step(measure)
+    scheduler.step()
 
 flog.close()
