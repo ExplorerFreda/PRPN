@@ -4,8 +4,10 @@ import nltk
 import numpy
 import torch
 from torch.autograd import Variable
+from tqdm import tqdm 
 
 import data_ptb as data
+from utils import evalb
 
 
 # Test model
@@ -49,17 +51,11 @@ def mean(x):
     return sum(x) / len(x)
 
 
-def test(model, corpus, cuda, prt=False):
+def test(model, corpus, info, cuda, evalb_dir):
     model.eval()
 
-    prec_list = []
-    reca_list = []
-    f1_list = []
-
-    nsens = 0
-    for sen, sen_tree in zip(corpus.train_sens, corpus.train_trees):
-        if len(sen) > 12:
-            continue
+    parse_trees = []
+    for sen, sen_tree in tqdm(list(zip(*info))):
         x = numpy.array([corpus.dictionary[w] for w in sen])
         input = Variable(torch.LongTensor(x[:, None]))
         if cuda:
@@ -72,44 +68,12 @@ def test(model, corpus, cuda, prt=False):
         gates = model.gates.squeeze().data.cpu().numpy()
 
         depth = gates[1:-1]
-        sen = sen[1:-1]
+        sen = sen_tree.pos()
         attentions = attentions[1:-1]
         parse_tree = build_tree(depth, sen)
+        parse_trees.append(parse_tree)
 
-        model_out, _ = get_brackets(parse_tree)
-        std_out, _ = get_brackets(sen_tree)
-        overlap = model_out.intersection(std_out)
-
-        prec = float(len(overlap)) / (len(model_out) + 1e-8)
-        reca = float(len(overlap)) / (len(std_out) + 1e-8)
-        if len(std_out) == 0:
-            reca = 1.
-            if len(model_out) == 0:
-                prec = 1.
-        f1 = 2 * prec * reca / (prec + reca + 1e-8)
-        prec_list.append(prec)
-        reca_list.append(reca)
-        f1_list.append(f1)
-
-        nsens += 1
-        if prt and nsens % 100 == 0:
-            # for i in range(len(sen)):
-            #     print '%15s\t%.2f\t%s' % (sen[i], depth[i], str(attentions[i, 1]))
-            print('Model output:')
-            print(parse_tree)
-            print(model_out)
-            print('Standard output:')
-            print(sen_tree)
-            print(std_out)
-            print('Prec: %f, Reca: %f, F1: %f' % (prec, reca, f1))
-            print('-' * 80)
-
-    if prt:
-        print('-' * 80)
-        print('Mean Prec: %f, Mean Reca: %f, Mean F1: %f' % (mean(prec_list), mean(reca_list), mean(f1_list)))
-        print('Number of sentence: %i' % nsens)
-
-    return mean(f1_list)
+    return evalb(parse_trees, info[1], evalb_dir)
 
 
 if __name__ == '__main__':
@@ -145,4 +109,4 @@ if __name__ == '__main__':
     # Load data
     corpus = data.Corpus(args.data)
 
-    test(model, corpus, args.cuda, prt=True)
+    test(model, corpus, args.cuda)
