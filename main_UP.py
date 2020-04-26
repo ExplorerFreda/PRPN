@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.autograd import Variable
+torch.backends.cudnn.enabled = False
 
 import data_ptb as data
 from model_PRPN import PRPN
