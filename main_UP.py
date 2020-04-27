@@ -249,7 +249,7 @@ for epoch in range(1, args.epochs + 1):
     for idx in range(0, 55*5, 55):
         dev_f1 = test(model, corpus, (corpus.valid_sens[idx:idx+55], corpus.valid_trees[idx:idx+55]), args.cuda, args.evalb_dir)
         print('| few-shot dev f1 {:5.2f} |'.format(dev_f1))
-        flog.write('| few-shot dev f1 {:5.2f} |'.format(dev_f1))
+        flog.write('| few-shot dev f1 {:5.2f} |'.format(dev_f1) + '\n')
     # Save the model if the validation loss is the best we've seen so far.
     measure = dev_loss
     if not best_measure or measure < best_measure:
