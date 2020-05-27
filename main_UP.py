@@ -73,12 +73,12 @@ args = parser.parse_args()
 torch.cuda.set_device(args.device)
 
 # Set the random seed manually for reproducibility.
-torch.manual_seed(args.seed)
-if torch.cuda.is_available():
-    if not args.cuda:
-        print("WARNING: You have a CUDA device, so you should probably run with --cuda")
-    else:
-        torch.cuda.manual_seed(args.seed)
+# torch.manual_seed(args.seed)
+# if torch.cuda.is_available():
+#    if not args.cuda:
+#        print("WARNING: You have a CUDA device, so you should probably run with --cuda")
+#    else:
+#        torch.cuda.manual_seed(args.seed)
 
 ###############################################################################
 # Load data
@@ -118,10 +118,9 @@ def batchify(data, bsz):
     return data_batched
 
 
-eval_batch_size = 32
 train_data = batchify(corpus.train, args.batch_size)
-val_data = batchify(corpus.valid, eval_batch_size)
-test_data = batchify(corpus.test, eval_batch_size)
+val_data = batchify(corpus.valid, args.batch_size)
+test_data = batchify(corpus.test, args.batch_size)
 
 ###############################################################################
 # Build the model
@@ -189,6 +188,7 @@ def train():
     total_loss = 0
     start_time = time.time()
     ntokens = len(corpus.dictionary)
+    train_loss = train_sum = 0
     for batch in range(len(train_data)):
         data, targets, mask = get_batch(train_data, batch)
         # Starting each batch, we detach the hidden state from how it was previously produced.
@@ -204,6 +204,8 @@ def train():
         optimizer.step()
 
         total_loss += loss.data
+        train_loss += loss.data[0] * mask.sum().float().data[0]
+        train_sum += mask.sum().data[0]
 
         if batch % args.log_interval == 0 and batch > 0:
             cur_loss = total_loss[0] / args.log_interval
@@ -218,38 +220,41 @@ def train():
     model.eval()
     loss = total_sum = 0
     for batch in range(len(val_data)):
-        data, targets, mask = get_batch(train_data, batch, True)
+        data, targets, mask = get_batch(val_data, batch, True)
         hidden = model.init_hidden(args.batch_size)
         output, _ = model(data, hidden)
         loss += criterion(output.view(-1, ntokens), targets, mask) * mask.sum()
         total_sum += mask.sum()
-    return loss.data[0] / total_sum.data[0] 
+    return train_loss / train_sum, loss.data[0] / total_sum.data[0] 
     
 
 # Loop over epochs.
 lr = args.lr
 best_measure = None
 optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0, 0.999), eps=1e-9, weight_decay=args.weight_decay)
-scheduler = lr_scheduler.StepLR(optimizer, 25, 0.5)
+scheduler = lr_scheduler.StepLR(optimizer, 50, 0.5)
 flog = open(args.save.replace('.pt', '.log'), 'w')
 
 # At any point you can hit Ctrl + C to break out of training early.
 
 for epoch in range(1, args.epochs + 1):
     epoch_start_time = time.time()
-    dev_loss = train()
+    train_loss, dev_loss = train()
     dev_f1 = test(model, corpus, (corpus.valid_sens, corpus.valid_trees), args.cuda, args.evalb_dir)
     test_f1 = test(model, corpus, (corpus.test_sens, corpus.test_trees), args.cuda, args.evalb_dir)
     print('-' * 89)
-    print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | dev f1 {:5.2f} | test f1 {:5.2f}'.format(
-        epoch, (time.time() - epoch_start_time), dev_loss, dev_f1, test_f1))
+    print('| end of epoch {:3d} | time: {:5.2f}s | train loss {:5.2f} | valid loss {:5.2f} | dev f1 {:5.2f} | test f1 {:5.2f}'.format(
+        epoch, (time.time() - epoch_start_time), train_loss, dev_loss, dev_f1, test_f1))
     print('-' * 89)
-    flog.write('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | dev f1 {:5.2f} | test f1 {:5.2f}'.format(
-        epoch, (time.time() - epoch_start_time), dev_loss, dev_f1, test_f1) + '\n')
-    for idx in range(0, 55*5, 55):
-        dev_f1 = test(model, corpus, (corpus.valid_sens[idx:idx+55], corpus.valid_trees[idx:idx+55]), args.cuda, args.evalb_dir)
-        print('| few-shot dev f1 {:5.2f} |'.format(dev_f1))
-        flog.write('| few-shot dev f1 {:5.2f} |'.format(dev_f1) + '\n')
+    flog.write('| end of epoch {:3d} | time: {:5.2f}s | train loss {:5.2f} | valid loss {:5.2f} | dev f1 {:5.2f} | test f1 {:5.2f}'.format(
+        epoch, (time.time() - epoch_start_time), train_loss, dev_loss, dev_f1, test_f1) + '\n')
+    for few_num in [15, 25, 55, 105]:
+        print('few-shot num: {:d}'.format(few_num))
+        flog.write('few-shot num: {:d}\n'.format(few_num))
+        for idx in range(0, few_num*5, few_num):
+            few_dev_f1 = test(model, corpus, (corpus.valid_sens[idx:idx+few_num], corpus.valid_trees[idx:idx+few_num]), args.cuda, args.evalb_dir)
+            print('| few-shot dev f1 {:5.2f} |'.format(few_dev_f1))
+            flog.write('| few-shot dev f1 {:5.2f} |'.format(few_dev_f1) + '\n')
     # Save the model if the validation loss is the best we've seen so far.
     measure = dev_loss
     if not best_measure or measure < best_measure:
